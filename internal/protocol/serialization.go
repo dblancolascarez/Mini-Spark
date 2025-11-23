@@ -1,0 +1,1 @@
+// Serialización JSON/MsgPack

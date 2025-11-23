@@ -1,0 +1,1 @@
+# Script para simular fallos en un worker

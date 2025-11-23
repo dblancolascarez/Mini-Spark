@@ -1,0 +1,1 @@
+// Coordinación y registro de workers
