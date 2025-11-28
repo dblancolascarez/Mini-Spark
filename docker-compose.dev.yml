@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: mini-spark-dev
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    ports:
+      - "8080:8080"  # Master API
+      - "8081:8081"  # Worker
+    networks:
+      - spark-network
+
+  master:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: mini-spark-master
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+    working_dir: /app
+    command: sh -c "make build && ./bin/master"
+    ports:
+      - "8080:8080"
+    networks:
+      - spark-network
+    depends_on:
+      - dev
+
+  worker1:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: mini-spark-worker1
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+    working_dir: /app
+    command: sh -c "make build && ./bin/worker"
+    environment:
+      - WORKER_ID=worker-1
+      - MASTER_ADDRESS=master:8080
+    ports:
+      - "8081:8081"
+    networks:
+      - spark-network
+    depends_on:
+      - master
+
+  worker2:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: mini-spark-worker2
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+    working_dir: /app
+    command: sh -c "make build && ./bin/worker"
+    environment:
+      - WORKER_ID=worker-2
+      - MASTER_ADDRESS=master:8080
+    ports:
+      - "8082:8081"
+    networks:
+      - spark-network
+    depends_on:
+      - master
+
+volumes:
+  go-modules:
+
+networks:
+  spark-network:
+    driver: bridge

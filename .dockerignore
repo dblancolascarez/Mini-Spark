@@ -1,0 +1,9 @@
+# .dockerignore
+bin/
+*.exe
+.git/
+.gitignore
+*.md
+.vscode/
+.idea/
+data/output/*

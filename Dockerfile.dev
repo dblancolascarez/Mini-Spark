@@ -1,0 +1,23 @@
+# Dockerfile.dev - Para desarrollo con hot reload
+FROM golang:1.21-alpine
+
+# Instalar make y herramientas de desarrollo
+RUN apk add --no-cache make git bash gcc musl-dev
+
+# Establecer directorio de trabajo
+WORKDIR /app
+
+# Copiar go.mod y go.sum primero (para cache de dependencias)
+COPY go.mod go.sum* ./
+
+# Descargar dependencias
+RUN go mod download
+
+# Copiar todo el código fuente
+COPY . .
+
+# Exponer puertos para master y worker
+EXPOSE 8080 8081
+
+# Comando por defecto
+CMD ["/bin/bash"]
