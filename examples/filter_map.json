@@ -1,0 +1,44 @@
+{
+  "name": "Filter and Transform",
+  "description": "Filter records and apply transformation",
+  "parallelism": 2,
+  "partitions": 2,
+  "dag": {
+    "nodes": [
+      {
+        "id": "read",
+        "operator": "read_csv",
+        "params": {
+          "path": "data/input/sales.csv",
+          "columns": ["product", "price", "quantity"]
+        }
+      },
+      {
+        "id": "filter",
+        "operator": "filter",
+        "params": {
+          "condition": "price > 100"
+        }
+      },
+      {
+        "id": "map",
+        "operator": "map",
+        "params": {
+          "function": "calculate_total"
+        }
+      },
+      {
+        "id": "write",
+        "operator": "write_csv",
+        "params": {
+          "path": "data/output/filtered_sales.csv"
+        }
+      }
+    ],
+    "edges": [
+      {"from": "read", "to": "filter"},
+      {"from": "filter", "to": "map"},
+      {"from": "map", "to": "write"}
+    ]
+  }
+}

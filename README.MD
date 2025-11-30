@@ -14,17 +14,6 @@ sobre datos en archivos, con operadores como map, filter, reduce, join y aggrega
 - **Cliente**: CLI para enviar jobs y consultar estado
 
 
-## Estado del Proyecto
-**Semana 1 - Completada**
-- Diseño y scaffolding
-- Registro de workers
-- Sistema de heartbeats
-- API REST básica
-
-**Semana 2 - En progreso**
-- Planificación y ejecución básica
-
-
 ## Instalación y Uso
 
 ### Con Docker (Recomendado)
@@ -37,7 +26,10 @@ sobre datos en archivos, con operadores como map, filter, reduce, join y aggrega
 
 #### En diferentes terminales:
 **Utilizar Docker en terminales**
-`docker exec -it 8857fb9e697c /bin/bash`
+`docker exec -it <CONTAINER_ID> /bin/bash`
+
+**Importante: instalar curl**
+`apk add curl jq`
 
 **Terminal 1: Master**
 `./bin/master`
@@ -78,4 +70,64 @@ make build # Compilar
 make clean # Limpiar binarios
 make run-master # Ejecutar master
 make run-worker # Ejecutar worker
+```
+
+### Otros
+
+**Inicializar master**
+`./bin/master`
+
+**Inicializar worker**
+``` bash
+cd /app
+export WORKER_ID=worker-1
+./bin/worker
+```
+
+**Enviar job**
+`./bin/client submit examples/wordcount.json`
+
+**Ver job status**
+`curl -s http://localhost:8080/api/v1/jobs/$JOB_ID | jq`
+
+**Ver todos los jobs**
+`./bin/client list`
+
+**Ver estadisticas de jobs**
+`curl -s http://localhost:8080/api/v1/workers | jq '.stats'`
+
+**Ejemplo: Enviar 5 jobs consecutivos**
+``` bash
+for i in {1..5}; do
+  echo "Submitting job $i..."
+  ./bin/client submit examples/filter_map.json
+  sleep 0.5
+done
+```
+
+## TODO
+En Internal/master/job_executor.go
+``` go
+// AssignTaskToWorker asigna una tarea a un worker específico (para Semana 3)
+func (je *JobExecutor) AssignTaskToWorker(workerID string, task *protocol.TaskAssignment) error {
+	// TODO: Implementar en Semana 3
+	return fmt.Errorf("remote task execution not yet implemented")
+}
+```
+En Internal/operators/agregate.go
+``` go
+// AssignTaskToWorker asigna una tarea a un worker específico (para Semana 3)
+func (je *JobExecutor) AssignTaskToWorker(workerID string, task *protocol.TaskAssignment) error {
+	// TODO: Implementar en Semana 3
+	return fmt.Errorf("remote task execution not yet implemented")
+}
+```
+
+En Internal/operator/shuffle.go
+``` go
+// Execute ejecuta el shuffle
+func (s *ShuffleOperator) Execute(input []Record) ([]Record, error) {
+	// TODO: Implementar en Semana 3
+	return nil, fmt.Errorf("shuffle operator not yet implemented")
+}
 ```

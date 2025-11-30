@@ -1,0 +1,45 @@
+{
+  "name": "WordCount Example",
+  "description": "Count word occurrences in text file",
+  "parallelism": 2,
+  "partitions": 4,
+  "dag": {
+    "nodes": [
+      {
+        "id": "read",
+        "operator": "read_csv",
+        "params": {
+          "path": "data/input/words.csv",
+          "columns": ["text"]
+        }
+      },
+      {
+        "id": "split",
+        "operator": "flat_map",
+        "params": {
+          "function": "split_words"
+        }
+      },
+      {
+        "id": "count",
+        "operator": "reduce_by_key",
+        "params": {
+          "key": "word",
+          "function": "count"
+        }
+      },
+      {
+        "id": "write",
+        "operator": "write_csv",
+        "params": {
+          "path": "data/output/wordcount_result.csv"
+        }
+      }
+    ],
+    "edges": [
+      {"from": "read", "to": "split"},
+      {"from": "split", "to": "count"},
+      {"from": "count", "to": "write"}
+    ]
+  }
+}
