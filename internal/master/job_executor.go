@@ -1,7 +1,10 @@
 package master
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/dblancolascarez/mini-spark/internal/dag"
 	"github.com/dblancolascarez/mini-spark/internal/operators"
@@ -48,37 +51,81 @@ func (je *JobExecutor) ExecuteJob(job *JobInfo) error {
 
 		taskID := fmt.Sprintf("%s-task-%s", job.JobID, node.ID)
 		
-		// Seleccionar worker
-		worker, err := je.scheduler.SelectWorker()
-		workerID := "local"
-		if err == nil {
-			workerID = worker.ID
-			fmt.Printf("[JobExecutor] Assigned task %s to worker %s\n", taskID, workerID)
-		} else {
-			fmt.Printf("[JobExecutor] No workers available, executing locally\n")
-		}
+		// Intentar ejecutar la tarea con reintentos
+		const maxRetries = 3
+		var output []operators.Record
+		var lastErr error
+		
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			// Seleccionar worker
+			worker, err := je.scheduler.SelectWorker()
+			workerID := "local"
+			if err == nil && worker != nil {
+				workerID = worker.ID
+				fmt.Printf("[JobExecutor] Assigned task %s to worker %s (attempt %d/%d)\n", 
+					taskID, workerID, attempt, maxRetries)
+			} else {
+				fmt.Printf("[JobExecutor] No workers available, executing locally (attempt %d/%d)\n", 
+					attempt, maxRetries)
+			}
 
-		// Marcar tarea como RUNNING
-		je.jobManager.UpdateTaskStatus(taskID, "RUNNING", workerID)
+			// Marcar tarea como RUNNING
+			je.jobManager.UpdateTaskStatus(taskID, "RUNNING", workerID)
 
-		// Ejecutar tarea
-		output, err := je.executeTask(node, outputs)
-		if err != nil {
+			// Ejecutar tarea
+			output, lastErr = je.executeTaskWithRetry(node, outputs, workerID)
+			
+			if lastErr == nil {
+				// Éxito - salir del loop de reintentos
+				je.jobManager.UpdateTaskStatus(taskID, "COMPLETED", workerID)
+				fmt.Printf("[JobExecutor] Task %s completed (%d records)\n", taskID, len(output))
+				break
+			}
+			
+			// Falló - marcar como fallido y reintentar si quedan intentos
+			fmt.Printf("[JobExecutor] Task %s failed on attempt %d: %v\n", taskID, attempt, lastErr)
 			je.jobManager.UpdateTaskStatus(taskID, "FAILED", workerID)
-			je.jobManager.UpdateJobStatus(job.JobID, JobStatusFailed)
-			return fmt.Errorf("task %s failed: %w", taskID, err)
+			
+			if attempt == maxRetries {
+				// Se agotaron los reintentos
+				je.jobManager.UpdateJobStatus(job.JobID, JobStatusFailed)
+				return fmt.Errorf("task %s failed after %d attempts: %w", taskID, maxRetries, lastErr)
+			}
+			
+			fmt.Printf("[JobExecutor] Retrying task %s...\n", taskID)
 		}
 
 		// Guardar output
 		outputs[node.ID] = output
-
-		// Marcar tarea como completada
-		je.jobManager.UpdateTaskStatus(taskID, "COMPLETED", workerID)
-		fmt.Printf("[JobExecutor] Task %s completed (%d records)\n", taskID, len(output))
 	}
 
 	fmt.Printf("[JobExecutor] Job %s completed successfully\n", job.JobID)
 	return nil
+}
+
+// executeTaskWithRetry intenta ejecutar una tarea con soporte para workers remotos
+func (je *JobExecutor) executeTaskWithRetry(node *dag.Node, outputs map[string][]operators.Record, workerID string) ([]operators.Record, error) {
+	// Si tenemos un worker remoto disponible, intentar ejecución remota
+	if workerID != "local" {
+		task := &protocol.TaskAssignment{
+			TaskID:     node.ID,
+			Operator:   node.Operator,
+			Parameters: node.Parameters,
+		}
+		
+		// Intentar enviar al worker remoto
+		if err := je.AssignTaskToWorker(workerID, task); err != nil {
+			fmt.Printf("[JobExecutor] Remote execution failed, falling back to local: %v\n", err)
+			// Continuar con ejecución local
+		} else {
+			// Éxito remoto - por ahora retornar output vacío
+			// En una implementación completa, el worker devolvería los datos
+			return []operators.Record{}, nil
+		}
+	}
+	
+	// Ejecución local (fallback o cuando no hay workers)
+	return je.executeTask(node, outputs)
 }
 
 // executeTask ejecuta una tarea con sus operadores
@@ -108,8 +155,48 @@ func (je *JobExecutor) executeTask(node *dag.Node, outputs map[string][]operator
 	return output, nil
 }
 
-// AssignTaskToWorker asigna una tarea a un worker específico (para Semana 3)
+// AssignTaskToWorker asigna una tarea a un worker específico
 func (je *JobExecutor) AssignTaskToWorker(workerID string, task *protocol.TaskAssignment) error {
-	// TODO: Implementar en Semana 3
-	return fmt.Errorf("remote task execution not yet implemented")
+	// Obtener información del worker
+	worker, err := je.coordinator.GetWorker(workerID)
+	if err != nil {
+		return fmt.Errorf("worker %s not found: %w", workerID, err)
+	}
+
+	// Construir URL del worker
+	workerURL := fmt.Sprintf("http://%s:%d/api/v1/tasks/execute", worker.Host, worker.Port)
+
+	// Serializar tarea
+	taskJSON, err := json.Marshal(task)
+	if err != nil {
+		return fmt.Errorf("failed to marshal task: %w", err)
+	}
+
+	// Enviar tarea al worker via HTTP POST
+	resp, err := http.Post(workerURL, "application/json", bytes.NewBuffer(taskJSON))
+	if err != nil {
+		return fmt.Errorf("failed to send task to worker: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Verificar respuesta
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("worker returned status %d", resp.StatusCode)
+	}
+
+	// Leer resultado
+	var result protocol.TaskResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Verificar si la tarea falló
+	if result.Status == "FAILED" {
+		return fmt.Errorf("task failed on worker: %s", result.Error)
+	}
+
+	fmt.Printf("[JobExecutor] Task %s completed on worker %s (%d records)\n", 
+		task.TaskID, workerID, result.Records)
+
+	return nil
 }

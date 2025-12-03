@@ -4,6 +4,7 @@
 import (
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -32,11 +33,32 @@ func main() {
 		masterAddress = config.Worker.MasterAddress
 	}
 
+	// Asignar puerto dinámicamente
+	// Si se especifica WORKER_PORT, usar ese; sino buscar puerto disponible
+	workerPort := 0 // 0 = el sistema asigna automáticamente
+	if portEnv := os.Getenv("WORKER_PORT"); portEnv != "" {
+		fmt.Sscanf(portEnv, "%d", &workerPort)
+	}
+	
+	if workerPort == 0 {
+		// Buscar puerto disponible automáticamente
+		workerPort = findAvailablePort(8081, 8100)
+	}
+
 	fmt.Printf("[Worker] ID: %s\n", workerID)
 	fmt.Printf("[Worker] Master: %s\n", masterAddress)
+	fmt.Printf("[Worker] Port: %d\n", workerPort)
+
+	// Crear servidor HTTP para recibir tareas
+	server := worker.NewServer(workerID, workerPort)
+	go func() {
+		if err := server.Start(); err != nil {
+			log.Fatalf("[Worker] Server failed: %v", err)
+		}
+	}()
 
 	// Crear cliente para comunicarse con master
-	client := worker.NewClient(workerID, masterAddress, "localhost", config.Worker.Port)
+	client := worker.NewClient(workerID, masterAddress, "localhost", workerPort)
 
 	// Registrarse con el master
 	fmt.Println("[Worker] Registering with master...")
@@ -78,4 +100,26 @@ func sendHeartbeats(client *worker.Client, interval time.Duration) {
 			fmt.Printf("[Worker] Heartbeat sent (memory: %dMB)\n", memoryMB)
 		}
 	}
+}
+
+// findAvailablePort busca un puerto disponible en el rango especificado
+func findAvailablePort(start, end int) int {
+	for port := start; port <= end; port++ {
+		if isPortAvailable(port) {
+			return port
+		}
+	}
+	// Si no encuentra puerto disponible, retornar el default
+	return 8081
+}
+
+// isPortAvailable verifica si un puerto está disponible
+func isPortAvailable(port int) bool {
+	address := fmt.Sprintf(":%d", port)
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return false
+	}
+	listener.Close()
+	return true
 }

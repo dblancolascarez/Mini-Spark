@@ -210,6 +210,51 @@ func (jm *JobManager) ListJobs() []*JobInfo {
 	return jobs
 }
 
+// GetTasksForWorker retorna las tareas asignadas a un worker específico
+func (jm *JobManager) GetTasksForWorker(workerID string) []*TaskInfo {
+	jm.mu.RLock()
+	defer jm.mu.RUnlock()
+
+	var tasks []*TaskInfo
+	for _, job := range jm.jobs {
+		for _, task := range job.Tasks {
+			if task.WorkerID == workerID && task.Status == "RUNNING" {
+				tasks = append(tasks, task)
+			}
+		}
+	}
+	return tasks
+}
+
+// RescheduleTasks marca tareas como pendientes para replanificación
+func (jm *JobManager) RescheduleTasks(workerID string) int {
+	jm.mu.Lock()
+	defer jm.mu.Unlock()
+
+	rescheduled := 0
+	for _, job := range jm.jobs {
+		// Solo replanificar tareas de jobs en estado RUNNING
+		if job.Status != JobStatusRunning {
+			continue
+		}
+
+		for _, task := range job.Tasks {
+			if task.WorkerID == workerID && task.Status == "RUNNING" {
+				// Marcar como pendiente para reintentar
+				task.Status = "PENDING"
+				task.WorkerID = ""
+				task.Retries++
+				rescheduled++
+				
+				fmt.Printf("[JobManager] Rescheduling task %s (job %s) - retry #%d\n", 
+					task.TaskID, task.JobID, task.Retries)
+			}
+		}
+	}
+
+	return rescheduled
+}
+
 // GetJobStatusResponse convierte JobInfo a protocolo
 func (jm *JobManager) GetJobStatusResponse(jobID string) (*protocol.JobStatusResponse, error) {
 	job, err := jm.GetJob(jobID)

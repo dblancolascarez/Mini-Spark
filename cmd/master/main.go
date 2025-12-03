@@ -36,7 +36,7 @@ func main() {
 	server := api.NewServer(coordinator, scheduler, jobManager, config.Master.Port)
 
 	// Iniciar monitoreo de workers en goroutine
-	go monitorWorkers(coordinator)
+	go monitorWorkers(coordinator, jobManager)
 
 	// Iniciar servidor API en goroutine
 	go func() {
@@ -59,7 +59,7 @@ func main() {
 }
 
 // monitorWorkers verifica periódicamente el estado de los workers
-func monitorWorkers(coordinator *master.Coordinator) {
+func monitorWorkers(coordinator *master.Coordinator, jobManager *master.JobManager) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -67,6 +67,14 @@ func monitorWorkers(coordinator *master.Coordinator) {
 		deadWorkers := coordinator.CheckDeadWorkers()
 		if len(deadWorkers) > 0 {
 			fmt.Printf("[Monitor] Detected %d dead worker(s)\n", len(deadWorkers))
+			
+			// Replanificar tareas de workers caídos
+			for _, workerID := range deadWorkers {
+				rescheduled := jobManager.RescheduleTasks(workerID)
+				if rescheduled > 0 {
+					fmt.Printf("[Monitor] Rescheduled %d tasks from worker %s\n", rescheduled, workerID)
+				}
+			}
 		}
 
 		active, total := coordinator.GetWorkerCount()
