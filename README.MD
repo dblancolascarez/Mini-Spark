@@ -167,17 +167,18 @@ go build -o bin/client ./cmd/client
 
 # 4. Iniciar Workers (Terminales 2-3)
 # Worker 1
-export WORKER_ID=worker-1
-./bin/worker
+export WORKER_ID=worker-1 && ./bin/worker
 
 # Worker 2
-export WORKER_ID=worker-2
-./bin/worker
+export WORKER_ID=worker-2 && ./bin/worker
 
 # 5. Enviar Job (Terminal 4)
 ./bin/client submit examples/wordcount.json
 ./bin/client list
 ```
+
+# 6. Ver resultados
+cat data/output/wordcount_result.csv
 
 ### Opción 2: Con Docker
 
