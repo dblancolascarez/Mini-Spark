@@ -24,7 +24,7 @@ func NewExecutor(workerID string) *Executor {
 
 // ExecuteTask ejecuta una tarea específica
 func (e *Executor) ExecuteTask(task *protocol.TaskAssignment) (*protocol.TaskResult, error) {
-	fmt.Printf("[Executor:%s] Executing task %s (operator: %s)\n", 
+	fmt.Printf("[Executor:%s] Executing task %s (operator: %s)\n",
 		e.workerID, task.TaskID, task.Operator)
 
 	// Crear el operador
@@ -40,9 +40,12 @@ func (e *Executor) ExecuteTask(task *protocol.TaskAssignment) (*protocol.TaskRes
 	}
 
 	// Ejecutar operador
-	// Por ahora los operadores de lectura no necesitan input
-	var input []operators.Record
-	
+	// Convertir Input de la tarea a []operators.Record
+	input := make([]operators.Record, len(task.Input))
+	for i, data := range task.Input {
+		input[i] = operators.Record(data)
+	}
+
 	output, err := op.Execute(input)
 	if err != nil {
 		return &protocol.TaskResult{
@@ -53,13 +56,20 @@ func (e *Executor) ExecuteTask(task *protocol.TaskAssignment) (*protocol.TaskRes
 		}, err
 	}
 
-	fmt.Printf("[Executor:%s] Task %s completed (%d records)\n", 
+	fmt.Printf("[Executor:%s] Task %s completed (%d records)\n",
 		e.workerID, task.TaskID, len(output))
+
+	// Convertir output a []map[string]interface{}
+	data := make([]map[string]interface{}, len(output))
+	for i, record := range output {
+		data[i] = map[string]interface{}(record)
+	}
 
 	return &protocol.TaskResult{
 		TaskID:     task.TaskID,
 		Status:     "COMPLETED",
 		Records:    len(output),
+		Data:       data,
 		OutputPath: task.OutputPath,
 	}, nil
 }

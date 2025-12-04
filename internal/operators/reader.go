@@ -64,26 +64,29 @@ func (r *ReaderOperator) readCSV() ([]Record, error) {
 	defer file.Close()
 
 	reader := csv.NewReader(file)
-	
+
 	// Leer header
 	header, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read header: %w", err)
 	}
 
-	// Si se especificaron columnas, usarlas en lugar del header
+	// Si se especificaron columnas personalizadas, usarlas
 	if cols, ok := r.params["columns"].([]interface{}); ok {
-		header = make([]string, len(cols))
+		customHeader := make([]string, len(cols))
 		for i, col := range cols {
-			header[i] = col.(string)
+			customHeader[i] = col.(string)
 		}
-		// Reiniciar el lector para leer desde el inicio
+		header = customHeader
+
+		// Si hay columnas personalizadas, reiniciar y saltar header real
 		file.Seek(0, 0)
 		reader = csv.NewReader(file)
+		reader.Read() // Saltar header del archivo
 	}
 
 	records := make([]Record, 0)
-	
+
 	for {
 		row, err := reader.Read()
 		if err == io.EOF {

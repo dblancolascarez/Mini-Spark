@@ -66,6 +66,50 @@ func (f *Factory) CreateOperator(node *dag.Node) (Operator, error) {
 		}
 		return NewFlatMapOperator(function, node.Parameters), nil
 
+	case "reduce_by_key":
+		key, ok := node.Parameters["key"].(string)
+		if !ok {
+			return nil, fmt.Errorf("reduce_by_key requires 'key' parameter")
+		}
+		// Aceptar 'fn' o 'function' para compatibilidad
+		fn, ok := node.Parameters["fn"].(string)
+		if !ok {
+			fn, ok = node.Parameters["function"].(string)
+			if !ok {
+				fn = "count" // default
+			}
+		}
+		return NewReduceOperator(key, fn, node.Parameters), nil
+
+	case "join":
+		joinType, ok := node.Parameters["type"].(string)
+		if !ok {
+			joinType = "inner" // default
+		}
+		leftKey, ok := node.Parameters["left_key"].(string)
+		if !ok {
+			return nil, fmt.Errorf("join requires 'left_key' parameter")
+		}
+		rightKey, ok := node.Parameters["right_key"].(string)
+		if !ok {
+			return nil, fmt.Errorf("join requires 'right_key' parameter")
+		}
+		return NewJoinOperator(joinType, leftKey, rightKey, node.Parameters), nil
+
+	case "aggregate":
+		fn, ok := node.Parameters["fn"].(string)
+		if !ok {
+			return nil, fmt.Errorf("aggregate requires 'fn' parameter")
+		}
+		return NewAggregateOperator(fn, node.Parameters), nil
+
+	case "shuffle":
+		partitions := 4 // default
+		if p, ok := node.Parameters["partitions"].(float64); ok {
+			partitions = int(p)
+		}
+		return NewShuffleOperator(partitions, node.Parameters), nil
+
 	default:
 		return nil, fmt.Errorf("unknown operator: %s", node.Operator)
 	}

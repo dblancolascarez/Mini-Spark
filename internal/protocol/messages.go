@@ -67,23 +67,25 @@ type JobSubmitResponse struct {
 
 // TaskAssignment - Master asigna tarea a Worker
 type TaskAssignment struct {
-	TaskID     string                 `json:"task_id"`
-	JobID      string                 `json:"job_id"`
-	Operator   string                 `json:"operator"`
-	Parameters map[string]interface{} `json:"parameters"`
-	InputPaths []string               `json:"input_paths,omitempty"`
-	OutputPath string                 `json:"output_path"`
+	TaskID     string                   `json:"task_id"`
+	JobID      string                   `json:"job_id"`
+	Operator   string                   `json:"operator"`
+	Parameters map[string]interface{}   `json:"parameters"`
+	Input      []map[string]interface{} `json:"input,omitempty"`
+	InputPaths []string                 `json:"input_paths,omitempty"`
+	OutputPath string                   `json:"output_path"`
 }
 
 // TaskResult - Worker reporta resultado de tarea
 type TaskResult struct {
-	TaskID     string `json:"task_id"`
-	JobID      string `json:"job_id"`
-	WorkerID   string `json:"worker_id"`
-	Status     string `json:"status"`
-	Records    int    `json:"records"`
-	OutputPath string `json:"output_path,omitempty"`
-	Error      string `json:"error,omitempty"`
+	TaskID     string                   `json:"task_id"`
+	JobID      string                   `json:"job_id"`
+	WorkerID   string                   `json:"worker_id"`
+	Status     string                   `json:"status"`
+	Records    int                      `json:"records"`
+	Data       []map[string]interface{} `json:"data,omitempty"`
+	OutputPath string                   `json:"output_path,omitempty"`
+	Error      string                   `json:"error,omitempty"`
 }
 
 // JobStatusRequest - Cliente consulta estado de job
