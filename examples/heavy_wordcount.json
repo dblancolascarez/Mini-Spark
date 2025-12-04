@@ -1,0 +1,45 @@
+{
+  "name": "Heavy WordCount (500K records)",
+  "description": "Process 500K records for fault tolerance demo",
+  "parallelism": 2,
+  "partitions": 4,
+  "dag": {
+    "nodes": [
+      {
+        "id": "read",
+        "operator": "read_csv",
+        "params": {
+          "path": "data/input/large_dataset.csv",
+          "columns": ["id", "text", "category"]
+        }
+      },
+      {
+        "id": "split",
+        "operator": "flat_map",
+        "params": {
+          "function": "split_words"
+        }
+      },
+      {
+        "id": "count",
+        "operator": "reduce_by_key",
+        "params": {
+          "key": "word",
+          "function": "count"
+        }
+      },
+      {
+        "id": "write",
+        "operator": "write_csv",
+        "params": {
+          "path": "data/output/heavy_wordcount_result.csv"
+        }
+      }
+    ],
+    "edges": [
+      {"from": "read", "to": "split"},
+      {"from": "split", "to": "count"},
+      {"from": "count", "to": "write"}
+    ]
+  }
+}
