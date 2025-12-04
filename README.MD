@@ -3,6 +3,9 @@
 **Sistema de procesamiento distribuido batch tipo Spark implementado en Go**  
 **Proyecto Ruta A - Principios de Sistemas Operativos**
 
+## Link del video
+https://drive.google.com/file/d/1mzK9OGvjY0QoGYZ1ECsZYaLrovXaXR2a/view?usp=sharing
+
 ---
 
 ##  Tabla de Contenidos
